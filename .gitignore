@@ -1,0 +1,4 @@
+/target
+
+# Downloaded + compiled TSPACK oracle (ACM-licensed; never committed).
+/tools/tspack/build/

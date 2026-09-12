@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # stable + beta for coverage; 1.81 pins the declared MSRV.
+        rust: [stable, beta, "1.81"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --all-targets
+      - name: Test
+        run: cargo test --all-targets
+      - name: Doctests
+        run: cargo test --doc
+
+  lint:
+    name: fmt + clippy + docs (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: rustdoc
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings

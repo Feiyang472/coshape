@@ -1,0 +1,18 @@
+[package]
+name = "coshape"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+description = "Shape-preserving 1-D spline interpolation: concavity- and monotonicity-preserving C² splines (tension, rational-cubic, variable-degree) behind a linfa-style fit API."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Feiyang472/coshape"
+readme = "README.md"
+keywords = ["interpolation", "spline", "shape-preserving", "convex", "numerics"]
+categories = ["mathematics", "algorithms"]
+authors = ["Feiyang Chen <feiyangc@outlook.com>"]
+
+[dependencies]
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = "1"

@@ -1,0 +1,24 @@
+name: regen-fixtures
+
+# Guards the tension port against silently drifting from the reference: it
+# downloads TSPACK from netlib, recompiles it, regenerates the golden fixtures,
+# and fails if they differ from what is committed. Not on the PR path (it needs
+# gfortran and the netlib download); run on demand or weekly.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+
+jobs:
+  regen:
+    name: regenerate + diff TSPACK fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gfortran + python
+        run: sudo apt-get update && sudo apt-get install -y gfortran python3
+      - name: Regenerate fixtures from TSPACK
+        run: python3 tools/tspack/gen_reference.py
+      - name: Fail if the committed fixtures drifted
+        run: git diff --exit-code -- tests/data/
