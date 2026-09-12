@@ -12,6 +12,15 @@ keeps `f'' <= 0` everywhere, and is at least C². Convex data gives the mirror
 image, and the tension and variable-degree methods also follow data that changes
 curvature, concave in one stretch and convex in the next.
 
+![Value, slope and curvature of the three methods on five concave points](docs/shape-preserving.png)
+
+The three methods fitted to five concave points, alongside scipy's
+`PchipInterpolator`. The fits agree closely in value, so the differences show in
+the derivatives: all three hold `f'' <= 0` across the whole range, while PCHIP —
+which preserves monotonicity rather than curvature, and is only C¹ — reaches
+`f'' = +2.57`. Each legend entry gives the closed form that method produces on
+the shaded interval, in the local coordinate `θ = x − 1`.
+
 ## Usage
 
 A *parameter* struct implements `Fit`; `fit` returns a model implementing
