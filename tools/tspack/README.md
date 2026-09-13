@@ -20,8 +20,14 @@ are our own thin drivers (`driver_unif.f`, `driver_sp.f`) and this script.
 Requires `gfortran` on `PATH` (or `FC=<compiler>`) and `numpy`:
 
 ```sh
-python3 tools/tspack/gen_reference.py
+uv run --no-project --with numpy python tools/tspack/gen_reference.py          # rewrite
+uv run --no-project --with numpy python tools/tspack/gen_reference.py --check  # compare
 ```
+
+`--check` writes nothing and exits non-zero if a regenerated value differs from
+the committed fixture by more than floating-point noise. CI runs it
+(`.github/workflows/regen-fixtures.yml`) whenever the fixtures or this directory
+change.
 
 First run downloads and compiles TSPACK; later runs reuse `build/` and only
 recompile what changed. Delete `build/` for a clean rebuild.

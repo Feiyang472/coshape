@@ -1,24 +1,33 @@
 name: regen-fixtures
 
-# Guards the tension port against silently drifting from the reference: it
-# downloads TSPACK from netlib, recompiles it, regenerates the golden fixtures,
-# and fails if they differ from what is committed. Not on the PR path (it needs
-# gfortran and the netlib download); run on demand or weekly.
+# Holds the committed TSPACK fixtures to the Fortran oracle: downloads TSPACK
+# from netlib, compiles it, regenerates the fixtures and compares them with the
+# committed ones, allowing only floating-point noise. It runs when something that
+# feeds the fixtures changes, or on demand. The Rust port itself is held to the
+# committed fixtures by tests/tspack_crossvalidation.rs in the ordinary CI.
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - tools/tspack/**
+      - tests/data/**
+      - .github/workflows/regen-fixtures.yml
+  pull_request:
+    paths:
+      - tools/tspack/**
+      - tests/data/**
+      - .github/workflows/regen-fixtures.yml
 
 jobs:
   regen:
-    name: regenerate + diff TSPACK fixtures
+    name: regenerate + compare TSPACK fixtures
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install gfortran + python
-        run: sudo apt-get update && sudo apt-get install -y gfortran python3
-      - name: Regenerate fixtures from TSPACK
-        run: python3 tools/tspack/gen_reference.py
-      - name: Fail if the committed fixtures drifted
-        run: git diff --exit-code -- tests/data/
+      - name: Install gfortran
+        run: sudo apt-get update && sudo apt-get install -y gfortran
+      - uses: astral-sh/setup-uv@v10
+      - name: Regenerate and compare with the committed fixtures
+        run: uv run --no-project --with numpy python tools/tspack/gen_reference.py --check

@@ -5,7 +5,7 @@ C     end slopes (IENDC=1, YP(1)=BV1, YP(N)=BVN), non-uniform tension so
 C     SIGS selects the minimal per-interval tension that preserves local
 C     convexity/monotonicity.  Returns the per-interval SIGMA, knot slopes
 C     YP, iteration count, and value/1st/2nd derivative on XE.  This mirrors
-C     shapefit's shape-preserving TensionSpline exactly.
+C     coshape's shape-preserving TensionSpline exactly.
       INTEGER N, M, ITER, IER
       DOUBLE PRECISION X(N), Y(N), BV1, BVN
       DOUBLE PRECISION XE(M), HE(M), HPE(M), HPPE(M)
