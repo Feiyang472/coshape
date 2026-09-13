@@ -4,8 +4,9 @@
 #
 # Nothing is pushed or published until every artifact has built and passed its
 # tests. The build jobs apply the bump locally — deterministic, from the same
-# base commit and part — and only the final job commits, tags, pushes and
-# publishes. A failed build leaves no tag, no release commit, no partial upload.
+# base commit and part — and only the final job commits, tags, publishes and
+# pushes. It publishes first: PyPI cannot take a release back, git can, so a
+# failed upload leaves no tag and no release commit behind.
 #
 # Opt a merge out with "[skip release]" in its commit message. The release
 # commit carries it too, so a release never triggers another one.
@@ -177,12 +178,16 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           uvx "$BUMP" bump "$PART"
           test "$(uvx "$BUMP" show current_version)" = "$VERSION"
-      - name: Push the release commit and tag
-        # Atomic: both refs land or neither does. If main moved since this run
-        # started, this fails here — before anything is published.
-        run: git push --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"
+      # A dry run is still checked against the remote's current refs: if main
+      # moved since this run started, or the tag already exists, this fails
+      # before anything is published.
+      - name: Check the push would land
+        run: git push --dry-run --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"
       - name: Publish to PyPI
         run: uv publish --trusted-publishing always "$RUNNER_TEMP"/dist/*
+      - name: Push the release commit and tag
+        # Atomic: both refs land or neither does.
+        run: git push --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
