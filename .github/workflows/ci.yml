@@ -83,10 +83,12 @@ jobs:
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
+          # Same maturin as release.yml, so a new release cannot break the
+          # release build without first breaking a pull request.
+          maturin-version: v1.15.0
           command: build
           args: --out dist --manifest-path python/Cargo.toml
           manylinux: auto
-          sccache: "true"
       - name: Test the built wheel
         run: |
           uv pip install --no-index --find-links dist coshape
@@ -96,3 +98,14 @@ jobs:
         run: |
           uv pip install mypy
           uv run --no-project python -m mypy.stubtest coshape
+      # The release publishes an sdist too; build and test it here as well.
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: v1.15.0
+          command: sdist
+          args: --out sdist --manifest-path python/Cargo.toml
+      - name: Build from source and test
+        run: |
+          uv pip install --reinstall --no-binary coshape sdist/*.tar.gz
+          uv run --no-project pytest python/tests -q

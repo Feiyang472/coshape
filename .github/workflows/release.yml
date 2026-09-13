@@ -40,6 +40,9 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   BUMP: bump-my-version@1.5.1
+  # Pinned, and kept in step with ci.yml: maturin-action otherwise installs the
+  # latest maturin, which pull requests would not have been tested against.
+  MATURIN: v1.15.0
   PART: ${{ inputs.part || 'patch' }}
 
 jobs:
@@ -82,6 +85,7 @@ jobs:
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: ${{ env.MATURIN }}
           target: ${{ matrix.platform.target }}
           args: --release --out dist --manifest-path python/Cargo.toml
           manylinux: auto
@@ -131,6 +135,7 @@ jobs:
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: ${{ env.MATURIN }}
           command: sdist
           args: --out dist --manifest-path python/Cargo.toml
       - name: Build from source and test

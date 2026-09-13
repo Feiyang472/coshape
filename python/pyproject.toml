@@ -10,7 +10,9 @@ description = "Shape-preserving 1-D spline interpolation: concavity- and monoton
 readme = "README-pypi.md"
 requires-python = ">=3.11"
 license = "MIT OR Apache-2.0"
-license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+# In a subdirectory for the same reason: the core crate's licences take the
+# sdist root.
+license-files = ["LICENSES/*"]
 authors = [{ name = "Feiyang Chen", email = "feiyangc@outlook.com" }]
 keywords = ["interpolation", "spline", "shape-preserving", "concave", "numerics"]
 classifiers = [
