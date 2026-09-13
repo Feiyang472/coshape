@@ -3,7 +3,7 @@
 C     Uniform-tension reference: build a C^2 Hermite tension spline with
 C     a single tension factor SIG on every interval (YPC2 solves for the
 C     C^2 knot slopes), then evaluate value / 1st / 2nd derivative on XE.
-C     This mirrors shapefit's uniform-tension TensionSpline exactly, so
+C     This mirrors coshape's uniform-tension TensionSpline exactly, so
 C     the two can be compared to floating-point tolerance.
 C
 C     ISL1/ISLN, BV1/BVN are the YPC2 end-condition flags/values:

@@ -5,7 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning:
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-09-06
+## [0.0.0] - 2026-09-06
 
 Initial release.
 
@@ -18,5 +18,5 @@ Initial release.
 - Cross-validation of `Tension` against Renka's TSPACK (ACM TOMS 716) via
   committed fixtures, so the tests need neither Fortran nor the network.
 
-[Unreleased]: https://github.com/Feiyang472/coshape/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Feiyang472/coshape/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Feiyang472/coshape/compare/v0.0.0...HEAD
+[0.0.0]: https://github.com/Feiyang472/coshape/releases/tag/v0.0.0

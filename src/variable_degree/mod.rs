@@ -89,6 +89,21 @@ impl VariableDegree {
         self
     }
 
+    /// The end-slope condition.
+    pub fn boundary(&self) -> EndSlopes {
+        self.boundary
+    }
+
+    /// The largest per-interval degree the selection may reach.
+    pub fn max_degree(&self) -> f64 {
+        self.max_degree
+    }
+
+    /// The maximum number of solve/raise iterations.
+    pub fn max_iterations(&self) -> usize {
+        self.max_iter
+    }
+
     fn end_slopes(&self, s: &Samples) -> (f64, f64) {
         match self.boundary {
             EndSlopes::Clamped { left, right } => (left, right),

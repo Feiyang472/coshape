@@ -110,6 +110,31 @@ impl RationalCubic {
         self
     }
 
+    /// The free shape parameters `(u, v)`.
+    pub fn shape(&self) -> (f64, f64) {
+        (self.u, self.v)
+    }
+
+    /// The end-slope condition.
+    pub fn boundary(&self) -> EndSlopes {
+        self.boundary
+    }
+
+    /// The strict-convexity margin `α`.
+    pub fn convexity_margin(&self) -> f64 {
+        self.margin
+    }
+
+    /// The fixed-point under-relaxation factor.
+    pub fn relaxation(&self) -> f64 {
+        self.relaxation
+    }
+
+    /// The maximum number of fixed-point iterations.
+    pub fn max_iterations(&self) -> usize {
+        self.max_iter
+    }
+
     fn validate(&self) -> Result<()> {
         let check = |name, value: f64, ok: bool, expected| {
             if ok {

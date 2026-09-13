@@ -1,0 +1,28 @@
+# The published wheel takes its version from here (pyproject sets
+# `dynamic = ["version"]`). Never edit it by hand: bump-my-version keeps it in
+# step with the core crate — see .bumpversion.toml.
+[package]
+name = "coshape-python"
+version = "0.0.0"
+edition = "2021"
+description = "Python bindings for coshape"
+repository = "https://github.com/Feiyang472/coshape"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Its own workspace root: the core crate's manifest declares no workspace, and
+# keeping this separate leaves `cargo build` at the repository root free of the
+# extension module.
+[workspace]
+
+[lib]
+name = "_coshape"
+crate-type = ["cdylib"]
+
+[dependencies]
+coshape = { path = ".." }
+# `extension-module` is deliberately NOT enabled here: with it on, the crate does
+# not link libpython, so a plain `cargo build`/`cargo test` of this crate fails at
+# link time. maturin turns it on for wheel builds via pyproject.toml.
+# abi3-py311: `PyBuffer` is only part of the stable ABI from Python 3.11.
+pyo3 = { version = "0.29", features = ["abi3-py311"] }

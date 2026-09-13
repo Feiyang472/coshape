@@ -3,7 +3,7 @@
 This is a *developer* tool, not part of the crate. It builds a reference oracle
 from Renka's **TSPACK** (ACM TOMS Algorithm 716) and records, for several
 datasets, the reference knot slopes plus value / 1st / 2nd derivative on a dense
-grid. The Rust test ``tests/tspack_crossvalidation.rs`` then asserts shapefit's
+grid. The Rust test ``tests/tspack_crossvalidation.rs`` then asserts coshape's
 port reproduces these to floating-point tolerance.
 
 Licensing: TSPACK is (c) ACM under the ACM Software License, which is *not*
@@ -15,14 +15,21 @@ not ACM's code -- are committed. See ``README.md`` in this directory.
 Requirements: ``gfortran`` on PATH (or set ``FC``), plus ``numpy``. Run from
 anywhere:
 
-    python3 tools/tspack/gen_reference.py
+    python3 tools/tspack/gen_reference.py            # rewrite the fixtures
+    python3 tools/tspack/gen_reference.py --check    # compare, write nothing
+
+``--check`` exits non-zero if a regenerated value differs from the committed one
+by more than floating-point noise.
 """
+import argparse
 import ctypes as C
 import gzip
 import json
+import math
 import os
 import shutil
 import subprocess
+import sys
 import urllib.request
 
 import numpy as np
@@ -37,6 +44,12 @@ _crate = os.path.abspath(os.path.join(_here, "..", ".."))
 # library, exactly as a human would when unpacking the archive.
 _NETLIB_URL = "https://netlib.org/toms/716.gz"
 _FORTRAN_START = "      SUBROUTINE ARCL2D"
+
+# `--check` tolerance. A different gfortran release or CPU can move the last few
+# digits of a regenerated value; anything beyond this is real drift. It sits far
+# below what tests/tspack_crossvalidation.rs itself allows (1e-9 and looser).
+CHECK_REL_TOL = 1e-12
+CHECK_ABS_TOL = 1e-12
 
 _p_d = np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS")
 _pi = C.POINTER(C.c_int)
@@ -167,7 +180,7 @@ def tsp_sp(lib_sp, x, y, bv1, bvn, xe):
 
 
 def parabolic_slope(h0, h1, d0, d1):
-    """Unconstrained parabolic end-slope estimate (shapefit's `Estimated`)."""
+    """Unconstrained parabolic end-slope estimate (coshape's `EndSlopes::Estimated`)."""
     return ((2.0 * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
 
 
@@ -201,15 +214,72 @@ def dataset_wiggle():
     return "wiggle", x, y
 
 
-def write(path, source, cases):
+def _is_number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _drift(committed, fresh, where=""):
+    """Yield one line for each place ``fresh`` disagrees with ``committed``.
+
+    Structure (keys, lengths, strings, integers) must match exactly; numbers may
+    differ by floating-point noise, as bounded by ``CHECK_*_TOL``.
+    """
+    if isinstance(committed, dict) and isinstance(fresh, dict):
+        if committed.keys() != fresh.keys():
+            yield f"{where}: keys {sorted(committed)} != {sorted(fresh)}"
+            return
+        for key in committed:
+            yield from _drift(committed[key], fresh[key], f"{where}.{key}")
+    elif isinstance(committed, list) and isinstance(fresh, list):
+        if len(committed) != len(fresh):
+            yield f"{where}: {len(committed)} values != {len(fresh)}"
+            return
+        for i, (a, b) in enumerate(zip(committed, fresh)):
+            yield from _drift(a, b, f"{where}[{i}]")
+    elif _is_number(committed) and _is_number(fresh):
+        if not math.isclose(committed, fresh, rel_tol=CHECK_REL_TOL, abs_tol=CHECK_ABS_TOL):
+            yield f"{where}: {committed!r} != {fresh!r}"
+    elif committed != fresh:
+        yield f"{where}: {committed!r} != {fresh!r}"
+
+
+def emit(path, source, cases, check):
+    """Write the fixture, or with ``check`` compare it with the committed one.
+
+    Returns whether the committed fixture still matches what TSPACK produces
+    (always true when writing).
+    """
     out = os.path.join(_crate, "tests", "data", path)
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w") as f:
-        json.dump(dict(source=source, cases=cases), f)
-    print(f"wrote {len(cases)} cases -> {os.path.relpath(out, _crate)}")
+    payload = dict(source=source, cases=cases)
+    if not check:
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        with open(out, "w") as f:
+            json.dump(payload, f)
+        print(f"wrote {len(cases)} cases -> {os.path.relpath(out, _crate)}")
+        return True
+
+    with open(out) as f:
+        committed = json.load(f)
+    # Round-trip through JSON so both sides hold the types the file does.
+    drift = list(_drift(committed, json.loads(json.dumps(payload))))
+    for line in drift[:20]:
+        print(f"  {path}{line}")
+    if len(drift) > 20:
+        print(f"  ... and {len(drift) - 20} more")
+    status = "matches" if not drift else f"{len(drift)} values drifted"
+    print(f"{path}: {status}")
+    return not drift
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="compare with the committed fixtures instead of rewriting them",
+    )
+    check = parser.parse_args(argv).check
+
     lib, lib_sp = _bind(*ensure_oracle())
     datasets = [dataset_smooth(), dataset_sharp()]
 
@@ -222,8 +292,8 @@ def main():
             ref = tsp_unif(lib, x, y, sigma, bv1, bvn, xe)
             unif.append(dict(dataset=name, x=x, y=y, sigma=sigma,
                              bv1=bv1, bvn=bvn, xe=xe, **ref))
-    write("tspack_reference.json",
-          "TSPACK ACM TOMS 716, YPC2 uniform tension, clamped ends", unif)
+    unif_ok = emit("tspack_reference.json",
+                   "TSPACK ACM TOMS 716, YPC2 uniform tension, clamped ends", unif, check)
 
     # Shape-preserving reference (TSPSI: SIGS-selected per-interval tension).
     sp = []
@@ -232,9 +302,11 @@ def main():
         xe = list(np.linspace(x[0], x[-1], 197))
         ref = tsp_sp(lib_sp, x, y, bv1, bvn, xe)
         sp.append(dict(dataset=name, x=x, y=y, bv1=bv1, bvn=bvn, xe=xe, **ref))
-    write("tspack_sigs_reference.json",
-          "TSPACK ACM TOMS 716, TSPSI shape-preserving (SIGS), clamped ends", sp)
+    sp_ok = emit("tspack_sigs_reference.json",
+                 "TSPACK ACM TOMS 716, TSPSI shape-preserving (SIGS), clamped ends", sp, check)
+
+    return 0 if unif_ok and sp_ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -2,3 +2,16 @@
 
 # Downloaded + compiled TSPACK oracle (ACM-licensed; never committed).
 /tools/tspack/build/
+
+# Extension-module build output (its own cargo workspace).
+/python/target/
+
+# Python build/test noise.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/python/dist/
+
+
+python/uv.lock
+python/**/*.so
