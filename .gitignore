@@ -11,3 +11,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 /python/dist/
+
+
+python/uv.lock
+python/**/*.so
