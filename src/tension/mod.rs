@@ -101,6 +101,29 @@ impl Tension {
         self
     }
 
+    /// The fixed tension factor, or `None` for the shape-preserving policy.
+    pub fn uniform_tension(&self) -> Option<f64> {
+        match self.policy {
+            Policy::Uniform(sigma) => Some(sigma),
+            Policy::ShapePreserving => None,
+        }
+    }
+
+    /// The end-slope condition.
+    pub fn boundary(&self) -> EndSlopes {
+        self.boundary
+    }
+
+    /// The tolerance for the shape-preserving tension search.
+    pub fn tolerance(&self) -> f64 {
+        self.tol
+    }
+
+    /// The maximum number of shape-preserving iterations.
+    pub fn max_iterations(&self) -> usize {
+        self.max_iter
+    }
+
     fn end_slopes(&self, s: &Samples) -> (f64, f64) {
         match self.boundary {
             EndSlopes::Clamped { left, right } => (left, right),
