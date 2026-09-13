@@ -28,6 +28,6 @@ jobs:
       - uses: actions/checkout@v7
       - name: Install gfortran
         run: sudo apt-get update && sudo apt-get install -y gfortran
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.1.0
       - name: Regenerate and compare with the committed fixtures
         run: uv run --no-project --with numpy python tools/tspack/gen_reference.py --check
