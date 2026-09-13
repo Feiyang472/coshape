@@ -1,0 +1,39 @@
+# One version for the crate and the wheel. The release workflow runs
+# `bump-my-version bump <part>` on every merge to main, which commits the new
+# version and tags it; see .github/workflows/release.yml.
+[tool.bumpversion]
+current_version = "0.1.0"
+commit = true
+tag = true
+tag_name = "v{new_version}"
+message = "Release {new_version} [skip release]"
+allow_dirty = false
+
+# Every search is anchored on the package name, so a dependency that happens to
+# share the version number can never be rewritten. A search that finds nothing
+# is an error, so a layout change fails the bump rather than half-applying it.
+
+[[tool.bumpversion.files]]
+filename = "Cargo.toml"
+search = "name = \"coshape\"\nversion = \"{current_version}\""
+replace = "name = \"coshape\"\nversion = \"{new_version}\""
+
+[[tool.bumpversion.files]]
+filename = "Cargo.lock"
+search = "name = \"coshape\"\nversion = \"{current_version}\""
+replace = "name = \"coshape\"\nversion = \"{new_version}\""
+
+[[tool.bumpversion.files]]
+filename = "python/Cargo.toml"
+search = "name = \"coshape-python\"\nversion = \"{current_version}\""
+replace = "name = \"coshape-python\"\nversion = \"{new_version}\""
+
+[[tool.bumpversion.files]]
+filename = "python/Cargo.lock"
+search = "name = \"coshape\"\nversion = \"{current_version}\""
+replace = "name = \"coshape\"\nversion = \"{new_version}\""
+
+[[tool.bumpversion.files]]
+filename = "python/Cargo.lock"
+search = "name = \"coshape-python\"\nversion = \"{current_version}\""
+replace = "name = \"coshape-python\"\nversion = \"{new_version}\""

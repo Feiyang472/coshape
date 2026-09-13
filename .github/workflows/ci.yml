@@ -18,7 +18,7 @@ jobs:
         # stable + beta for coverage; 1.81 pins the declared MSRV.
         rust: [stable, beta, "1.81"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
@@ -34,7 +34,7 @@ jobs:
     name: fmt + clippy + docs (stable)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -47,3 +47,51 @@ jobs:
         run: cargo doc --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  # The bindings are their own cargo workspace, so the jobs above do not reach
+  # them. Fast feedback only: one wheel, installed and tested with uv. The full
+  # platform matrix runs in release.yml.
+  bindings:
+    name: python bindings (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: astral-sh/setup-uv@v10
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: python
+      # A layout change that breaks a search in .bumpversion.toml fails here, on
+      # the pull request, rather than on main at release time.
+      - name: Release version bump still applies
+        run: uvx bump-my-version@1.5.1 bump patch --dry-run
+      - name: rustfmt
+        run: cargo fmt --all --check
+        working-directory: python
+      # pyo3's build script refuses an interpreter older than the abi3 floor
+      # (3.11), so pin one rather than rely on the runner image's python3.
+      - name: Python 3.11
+        run: uv venv --python 3.11
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: python
+        env:
+          PYO3_PYTHON: ${{ github.workspace }}/.venv/bin/python
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --out dist --manifest-path python/Cargo.toml
+          manylinux: auto
+          sccache: "true"
+      - name: Test the built wheel
+        run: |
+          uv pip install --no-index --find-links dist coshape
+          uv pip install pytest
+          uv run --no-project pytest python/tests -q
+      - name: Stubs match the compiled module
+        run: |
+          uv pip install mypy
+          uv run --no-project python -m mypy.stubtest coshape

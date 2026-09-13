@@ -1,5 +1,6 @@
 # The published wheel takes its version from here (pyproject sets
-# `dynamic = ["version"]`), so keep it equal to the core crate's version.
+# `dynamic = ["version"]`). Never edit it by hand: bump-my-version keeps it in
+# step with the core crate — see .bumpversion.toml.
 [package]
 name = "coshape-python"
 version = "0.1.0"

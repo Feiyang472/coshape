@@ -1,0 +1,184 @@
+# Every merge to main is a release: bump-my-version bumps the version, maturin
+# builds the wheels and sdist, uv tests and publishes them, and the release
+# commit and tag land on main.
+#
+# Nothing is pushed or published until every artifact has built and passed its
+# tests. The build jobs apply the bump locally — deterministic, from the same
+# base commit and part — and only the final job commits, tags, pushes and
+# publishes. A failed build leaves no tag, no release commit, no partial upload.
+#
+# Opt a merge out with "[skip release]" in its commit message. The release
+# commit carries it too, so a release never triggers another one.
+#
+# One-time setup:
+# - PyPI: add a trusted publisher for this repository with workflow
+#   `release.yml` and environment `pypi`. No API token is stored.
+# - If main is branch-protected, allow github-actions[bot] to push to it.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      part:
+        description: Version part to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: read
+
+# Queue, never cancel: cancelling mid-publish could leave a partial upload. If
+# main moves while a run is in flight, that run's atomic push fails before it
+# publishes anything, and the queued run releases the newer main.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  BUMP: bump-my-version@1.5.1
+  PART: ${{ inputs.part || 'patch' }}
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - id: plan
+        run: |
+          uvx "$BUMP" bump "$PART" --no-commit --no-tag
+          echo "version=$(uvx "$BUMP" show current_version)" >> "$GITHUB_OUTPUT"
+
+  wheels:
+    needs: plan
+    name: wheel (${{ matrix.platform.runner }} ${{ matrix.platform.target }})
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { runner: ubuntu-latest, target: x86_64 }
+          - { runner: ubuntu-latest, target: aarch64 }
+          - { runner: macos-latest, target: x86_64 }
+          - { runner: macos-latest, target: aarch64 }
+          - { runner: windows-latest, target: x64 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - name: Apply the version bump
+        shell: bash
+        # tr: output captured on a Windows runner can end in \r, which would
+        # otherwise fail the comparison.
+        run: |
+          uvx "$BUMP" bump "$PART" --no-commit --no-tag
+          test "$(uvx "$BUMP" show current_version | tr -d '\r')" = "${{ needs.plan.outputs.version }}"
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --manifest-path python/Cargo.toml
+          manylinux: auto
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.platform.runner }}-${{ matrix.platform.target }}
+          path: dist
+
+  # Only the runner's native wheels are installable here; the cross-built ones
+  # are covered by their build succeeding.
+  test:
+    needs: [plan, wheels]
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheel-${{ matrix.os }}-*
+          merge-multiple: true
+          path: dist
+      - name: Test the built wheel
+        shell: bash
+        # Pinning the planned version proves the bump reached the wheel.
+        run: |
+          uv venv --python 3.11
+          uv pip install --no-index --find-links dist "coshape==${{ needs.plan.outputs.version }}"
+          uv pip install pytest
+          uv run --no-project pytest python/tests -q
+
+  sdist:
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Apply the version bump
+        run: |
+          uvx "$BUMP" bump "$PART" --no-commit --no-tag
+          test "$(uvx "$BUMP" show current_version)" = "${{ needs.plan.outputs.version }}"
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist --manifest-path python/Cargo.toml
+      - name: Build from source and test
+        run: |
+          uv venv --python 3.11
+          uv pip install --no-binary coshape dist/*.tar.gz
+          uv pip install pytest
+          uv run --no-project pytest python/tests -q
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    needs: [plan, test, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write # push the release commit and tag, create the GitHub release
+      id-token: write # PyPI trusted publishing
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      # Outside the checkout, so the tree stays clean for the release commit.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheel-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: ${{ runner.temp }}/dist
+      - name: Commit and tag the release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          uvx "$BUMP" bump "$PART"
+          test "$(uvx "$BUMP" show current_version)" = "$VERSION"
+      - name: Push the release commit and tag
+        # Atomic: both refs land or neither does. If main moved since this run
+        # started, this fails here — before anything is published.
+        run: git push --atomic origin "HEAD:refs/heads/main" "refs/tags/v$VERSION"
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always "$RUNNER_TEMP"/dist/*
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" "$RUNNER_TEMP"/dist/* --title "v$VERSION" --generate-notes
