@@ -3,7 +3,7 @@
 # step with the core crate — see .bumpversion.toml.
 [package]
 name = "coshape-python"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
 description = "Python bindings for coshape"
 repository = "https://github.com/Feiyang472/coshape"
