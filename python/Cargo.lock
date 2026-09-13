@@ -4,14 +4,14 @@ version = 4
 
 [[package]]
 name = "coshape"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "coshape-python"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "coshape",
  "pyo3",
